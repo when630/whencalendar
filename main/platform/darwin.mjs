@@ -55,4 +55,10 @@ export const darwin = {
   },
 
   dataDirLabel: '~/Library/Application Support/whencalendar',
+
+  // 형제 앱 연동(D-33) — 설치 확인 경로는 .app 번들. 패키징본의 실행 파일은 번들 안(Contents/MacOS/…)이라 번들까지만 잘라 적는다.
+  link: {
+    verify: '/Applications/WHENCALENDAR.app',
+    bundleFromExe: (exe) => String(exe).match(/^(.*?\.app)\//)?.[1] ?? null,
+  },
 };

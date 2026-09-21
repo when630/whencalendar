@@ -4,6 +4,8 @@
 //   fromArgv        Windows/Linux는 URL이 argv로 온다(첫 실행이면 process.argv, 떠 있으면 second-instance)
 //   buildManifest   ~/.when/apps/whencalendar.json에 쓸 명령 목록 — WHENCOMMAND가 읽어 입력줄에 합친다
 
+import { win32, darwin } from './platform/index.mjs'; // OS 이름은 표에서 읽는다(PLAT-06) — 이 파일에 'darwin'·'win32'를 적지 않는다
+
 export const SCHEME = 'whencalendar';
 export const APP_ID = 'whencalendar';
 
@@ -34,17 +36,11 @@ export function fromArgv(argv) {
 // verify는 실제로 설치돼 있는지 WHENCOMMAND가 확인하는 경로다. 패키징본이면 지금 실행 파일(macOS는 .app 번들),
 // 개발 실행이면 설치본의 관례 경로 — 개발용 electron.exe를 적으면 설치본이 없는 PC에서도 "있다"고 읽힌다.
 export function buildManifest({ platformName, exePath, packaged }) {
-  const verify = {
-    darwin: '/Applications/WHENCALENDAR.app',
-    win32: '%LOCALAPPDATA%\\Programs\\WHENCALENDAR\\WHENCALENDAR.exe',
-  };
+  const verify = { [darwin.id]: darwin.link.verify, [win32.id]: win32.link.verify };
   if (packaged && exePath) {
-    if (platformName === 'darwin') {
-      const m = String(exePath).match(/^(.*?\.app)\//);
-      if (m) verify.darwin = m[1];
-    } else if (platformName === 'win32') {
-      verify.win32 = exePath;
-    }
+    const table = platformName === darwin.id ? darwin : win32;
+    const bundle = table.link.bundleFromExe(String(exePath));
+    if (bundle) verify[table.id] = bundle;
   }
   return {
     protocol: 1,

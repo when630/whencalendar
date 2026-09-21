@@ -38,4 +38,11 @@ export const win32 = {
   },
 
   dataDirLabel: '%APPDATA%\\whencalendar',
+
+  // 형제 앱 연동(D-33) — WHENCOMMAND가 "정말 설치돼 있나"를 확인할 경로. 개발 실행이면 설치본의 관례 경로를 적고,
+  // 패키징본이면 실제 실행 파일(bundleFromExe) — Windows는 exe 그 자체다.
+  link: {
+    verify: '%LOCALAPPDATA%\\Programs\\WHENCALENDAR\\WHENCALENDAR.exe',
+    bundleFromExe: (exe) => exe,
+  },
 };
