@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('cal', {
   series: (payload) => ipcRenderer.invoke('cal:series', payload),
   info: () => ipcRenderer.invoke('app:info'),
   onChanged: (fn) => ipcRenderer.on('cal:changed', () => fn()),
+  // 형제 앱 연동(D-33) — WHENCOMMAND가 whencalendar://<명령>으로 부른 것. { command, args }
+  onDeepLink: (fn) => ipcRenderer.on('cal:deeplink', (_e, payload) => fn(payload)),
   hide: () => ipcRenderer.send('win:hide'),
   minimize: () => ipcRenderer.send('win:minimize'),
   search: (q) => ipcRenderer.invoke('cal:search', q),

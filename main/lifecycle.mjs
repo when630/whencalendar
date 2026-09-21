@@ -15,7 +15,8 @@ import { stateAt, msUntilNextChange, DEFAULTS, dueReminders, remindText } from '
 import { syncAll, SYNC_INTERVAL_MS } from './sync.mjs';
 import { createUpdater } from './update.mjs';
 import { platform } from './platform/index.mjs';
-
+import { SCHEME, APP_ID as LINK_ID, parseDeepLink, fromArgv, buildManifest } from './deeplink.mjs';
+import os from 'node:os';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 
@@ -130,6 +131,16 @@ export function bootstrap() {
   //
   // --smoke·--seed는 락을 요구하지 않는다. 검사 도구는 앱이 떠 있는 채로 돌리게 되는데,
   // 락에 걸려 조용히 죽으면 출력이 비어도 통과한 것처럼 보인다 — 실제로 그랬다.
+  // 딥링크 스킴(D-33, when-protocol). 패키징본은 build.protocols가 OS에 등록해 두지만, 개발 실행은 electron.exe와 앱 경로를
+  // 함께 넘겨야 OS가 이 프로젝트로 연다. 스모크·시드는 시스템 설정을 건드리지 않는다.
+  if (!isSmoke && !isSeed) {
+    try {
+      if (app.isPackaged) app.setAsDefaultProtocolClient(SCHEME);
+      else app.setAsDefaultProtocolClient(SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+    } catch {}
+  }
+
+  // 두 번째 인스턴스는 argv에 딥링크를 싣고 온다(Windows/Linux) — 첫 인스턴스가 받아 처리한다.
   if (!isSmoke && !isSeed && !app.requestSingleInstanceLock()) {
     app.quit();
     return;
@@ -279,6 +290,36 @@ export function bootstrap() {
       tick();
     };
     registerIpc(ctx);
+
+    // ── 형제 앱 연동(D-33) — WHENCOMMAND가 whencalendar://<명령>?<인자> 로 부른다. 모르는 URL은 조용히 무시한다.
+    // 일정 추가는 확인 없이 넣지 않는다 — 한 줄을 대화상자에 채우고 읽은 결과를 보인 뒤 사용자가 Enter로 확정한다.
+    const handleDeepLink = (raw) => {
+      const link = parseDeepLink(raw);
+      if (!link) return false;
+      if (link.command === 'open') ctx.mainWindow.show();
+      else ctx.mainWindow.deepLink(link);
+      return true;
+    };
+    ctx.handleDeepLink = handleDeepLink;
+
+    // 매니페스트 — 실행될 때마다 덮어쓴다. 실패해도 앱은 멈추지 않는다: 연동은 더해지는 것이지 전제가 아니다.
+    try {
+      const linkDir = path.join(os.homedir(), '.when', 'apps');
+      fs.mkdirSync(linkDir, { recursive: true });
+      // process.platform은 platform/ 밖에서 읽지 않는다(PLAT-06) — 표의 id를 쓴다
+      const manifest = buildManifest({ platformName: platform.id, exePath: app.getPath('exe'), packaged: app.isPackaged });
+      fs.writeFileSync(path.join(linkDir, `${LINK_ID}.json`), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    } catch {}
+
+    app.on('second-instance', (_e, argv) => {
+      const url = fromArgv(argv);
+      if (!url || !handleDeepLink(url)) ctx.mainWindow.show(); // 딥링크가 아니면 사용자가 앱을 한 번 더 실행한 것 — 창을 보여 준다
+    });
+    app.on('open-url', (e, url) => { e.preventDefault(); handleDeepLink(url); }); // macOS — ready 뒤라 바로 처리한다
+    {
+      const first = fromArgv(process.argv);
+      if (first) handleDeepLink(first);
+    }
 
     ctx.updater = createUpdater({ onChange: () => rebuildTrayMenu() });
     ctx.tray = buildTray();

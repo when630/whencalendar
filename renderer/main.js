@@ -2011,3 +2011,20 @@ setInterval(() => {
 
 refreshInfo();
 load();
+
+// ── 형제 앱 연동(D-33) — WHENCOMMAND가 whencalendar://<명령>?<인자> 로 부른다. 창은 메인이 이미 보였다.
+//   add    한 줄을 새 일정 대화상자에 채운다 — 읽은 결과(미리보기)를 보고 Enter로 확정한다. 확인 없이 넣지 않는다
+//   search 검색을 열고 검색어를 넣는다
+window.cal.onDeepLink(({ command, args }) => {
+  if (command === 'search') {
+    if (state.overlay) closeOverlay();
+    openSearch();
+    el.searchIn.value = args?.q ?? '';
+    el.searchIn.dispatchEvent(new Event('input'));
+  } else if (command === 'add') {
+    if (state.view === 'search') closeView();
+    if (state.overlay) closeOverlay();
+    openDialog('event', args?.text ?? '');
+    previewParse();
+  }
+});

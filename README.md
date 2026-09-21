@@ -33,6 +33,8 @@
 | [WHENMAIL](https://github.com/when630/whenmail) | 이 사람한테 마지막으로 언제 연락했지 |
 | **WHENCALENDAR** | **다음 하나까지 몇 분 남았지 · 이번 주 어디가 비지** |
 
+**WHENCOMMAND에서** — [WHENCOMMAND](https://github.com/when630/whencommand)(시리즈의 입력줄)에서 `일정 추가 담주 화 3시 미팅` `Enter`면 이 창이 그 한 줄을 채운 채 뜨고, 읽은 결과를 보고 Enter로 확정합니다. `일정 검색` · `일정 보기`도 거기서 — `whencalendar://` 딥링크입니다. WHENCOMMAND가 없으면 아무 차이도 없습니다.
+
 **이 앱이 하지 않는 것** — 할 일·체크박스·마감(WHENWORK), 긴 메모·태그·백링크(WHENNOTE), 사람·연락 기록(WHENMAIL). 특히 **타임블로킹(할 일을 캘린더로 끌어다 놓기)은 넣지 않습니다** — 그 순간 WHENWORK를 삼킵니다.
 
 ## 만들 것

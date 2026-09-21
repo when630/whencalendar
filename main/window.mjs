@@ -15,6 +15,7 @@ export const MIN_H = 540;
 
 export function createMainWindow(settings) {
   let win = null;
+  let pendingLink = null; // 창이 로딩 중일 때 온 딥링크(D-33) — did-finish-load에서 넘긴다. push는 로딩 중이면 사라진다
 
   function build() {
     const saved = settings.get('mainBounds', null);
@@ -34,6 +35,12 @@ export function createMainWindow(settings) {
     });
 
     win.loadFile(path.join(HERE, '..', 'renderer', 'main.html'));
+    win.webContents.on('did-finish-load', () => {
+      if (pendingLink) {
+        win.webContents.send('cal:deeplink', pendingLink);
+        pendingLink = null;
+      }
+    });
 
     const remember = () => {
       if (!win || win.isDestroyed() || win.isMinimized()) return;
@@ -82,6 +89,13 @@ export function createMainWindow(settings) {
     // 방법이 사라진다.** before-quit에서 이것을 불러 빗장을 풀어야 한다.
     allowClose() {
       if (win && !win.isDestroyed()) win.__reallyClose = true;
+    },
+
+    // 형제 앱 연동(D-33) — 창을 보이고 명령을 렌더러에 넘긴다. 갓 만든 창이면 로딩이 끝난 뒤에
+    deepLink(payload) {
+      this.show();
+      if (win.webContents.isLoading()) pendingLink = payload;
+      else win.webContents.send('cal:deeplink', payload);
     },
 
     // 일정이 바뀌면 열려 있는 창에 알린다. 닫혀 있으면 다음에 열 때 어차피 다시 읽는다.

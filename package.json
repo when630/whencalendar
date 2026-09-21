@@ -28,6 +28,7 @@
   "build": {
     "appId": "com.when630.whencalendar",
     "productName": "WHENCALENDAR",
+    "protocols": [{ "name": "WHENCALENDAR", "schemes": ["whencalendar"] }],
     "files": [
       "main/**/*",
       "renderer/**/*",
