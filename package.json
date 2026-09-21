@@ -1,6 +1,6 @@
 {
   "name": "whencalendar",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "몰입해도 시간은 놓치지 않는다 — 상단 아일랜드 오버레이로 다음 일정까지 남은 시간을 알려주는 트레이 상주 캘린더",
@@ -13,9 +13,7 @@
     "test": "node --test \"test/**/*.test.mjs\"",
     "icons": "node tools/make-icon.mjs",
     "postinstall": "node tools/make-icon.mjs",
-    "build": "electron-builder --publish never",
-    "build:win": "electron-builder --win --publish never",
-    "build:mac": "electron-builder --mac --publish never"
+    "build": "electron-builder --win --publish never"
   },
   "devDependencies": {
     "electron": "^43.2.0",
@@ -28,14 +26,20 @@
   "build": {
     "appId": "com.when630.whencalendar",
     "productName": "WHENCALENDAR",
-    "protocols": [{ "name": "WHENCALENDAR", "schemes": ["whencalendar"] }],
+    "protocols": [
+      {
+        "name": "WHENCALENDAR",
+        "schemes": [
+          "whencalendar"
+        ]
+      }
+    ],
     "files": [
       "main/**/*",
       "renderer/**/*",
       "build/*.png"
     ],
     "artifactName": "WHENCALENDAR-${version}-${os}-${arch}.${ext}",
-    "afterPack": "tools/adhoc-sign.cjs",
     "win": {
       "target": [
         {
@@ -53,35 +57,6 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "WHENCALENDAR"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.icns",
-      "category": "public.app-category.productivity",
-      "identity": null,
-      "darkModeSupport": true,
-      "minimumSystemVersion": "11.0",
-      "extendInfo": {
-        "LSUIElement": true
-      }
-    },
-    "dmg": {
-      "title": "WHENCALENDAR ${version}"
     },
     "publish": [
       {
