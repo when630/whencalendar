@@ -306,7 +306,7 @@ export function bootstrap() {
     try {
       const linkDir = path.join(os.homedir(), '.when', 'apps');
       fs.mkdirSync(linkDir, { recursive: true });
-      // process.platform은 platform/ 밖에서 읽지 않는다(PLAT-06) — 표의 id를 쓴다
+      // OS 이름은 platform/ 표에서만 읽는다(PLAT-06) — 표의 id를 넘긴다
       const manifest = buildManifest({ platformName: platform.id, exePath: app.getPath('exe'), packaged: app.isPackaged });
       fs.writeFileSync(path.join(linkDir, `${LINK_ID}.json`), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
     } catch {}

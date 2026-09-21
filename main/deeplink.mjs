@@ -4,7 +4,7 @@
 //   fromArgv        Windows/Linux는 URL이 argv로 온다(첫 실행이면 process.argv, 떠 있으면 second-instance)
 //   buildManifest   ~/.when/apps/whencalendar.json에 쓸 명령 목록 — WHENCOMMAND가 읽어 입력줄에 합친다
 
-import { win32, darwin } from './platform/index.mjs'; // OS 이름은 표에서 읽는다(PLAT-06) — 이 파일에 'darwin'·'win32'를 적지 않는다
+import { win32, darwin } from './platform/index.mjs'; // OS 이름은 표에서 읽는다(PLAT-06) — 이 파일에 OS 이름 문자열을 적지 않는다
 
 export const SCHEME = 'whencalendar';
 export const APP_ID = 'whencalendar';
