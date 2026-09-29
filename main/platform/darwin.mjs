@@ -56,6 +56,25 @@ export const darwin = {
 
   dataDirLabel: '~/Library/Application Support/whencalendar',
 
+  // 전역 단축키 기본값. Windows와 같은 값을 쓴다 — 형제 앱과 조합표를 하나로 외우게 두려고.
+  // 사용자가 바꾼 값은 store의 setting 표(hotkeyWindow·hotkeyOverlay)에 있다.
+  hotkeys: { window: 'Control+Alt+C', overlay: 'Control+Alt+O' },
+
+  // 맥은 수식키를 기호로 읽는다(⌃⌥C). Apple 관례 순서(⌃ ⌥ ⇧ ⌘)로 붙여 쓴다.
+  hotkeyLabel: (accel) => {
+    const sym = { CommandOrControl: '⌘', Command: '⌘', Super: '⌘', Control: '⌃', Ctrl: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧' };
+    const order = ['⌃', '⌥', '⇧', '⌘'];
+    const mods = [];
+    const keys = [];
+    for (const part of String(accel ?? '').split('+').filter(Boolean)) {
+      if (sym[part]) {
+        if (!mods.includes(sym[part])) mods.push(sym[part]);
+      } else keys.push(part);
+    }
+    mods.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return [...mods, ...keys].join('');
+  },
+
   // 형제 앱 연동(D-33) — 설치 확인 경로는 .app 번들. 패키징본의 실행 파일은 번들 안(Contents/MacOS/…)이라 번들까지만 잘라 적는다.
   link: {
     verify: '/Applications/WHENCALENDAR.app',

@@ -150,6 +150,68 @@ export function bootstrap() {
   const sentReminders = new Set();
   const failedShortcuts = [];
 
+  // ── 전역 단축키 (PLAT-02)
+  //
+  // 자리(window·overlay)마다 조합 하나. 기본값은 platform 표, 바꾼 값은 store의 setting 표에
+  // hotkeyWindow·hotkeyOverlay로 있다. 빈 문자열은 "이 자리는 안 잡는다".
+  const HOTKEY_ACTIONS = {
+    window: { setting: 'hotkeyWindow', label: '창 열기·닫기', run: () => ctx.mainWindow?.toggle() },
+    overlay: {
+      setting: 'hotkeyOverlay',
+      label: '오버레이 잠시 끄기',
+      run: () => ctx.overlay?.setSuspended(!ctx.overlay.suspended),
+    },
+  };
+
+  function savedHotkeys() {
+    const out = {};
+    for (const [key, def] of Object.entries(HOTKEY_ACTIONS)) {
+      const v = ctx.store?.ok ? ctx.store.getSetting(def.setting, null) : null;
+      out[key] = typeof v === 'string' ? v : platform.hotkeys[key];
+    }
+    return out;
+  }
+
+  // register는 이미 잡힌 조합이면 **조용히 false를 돌려준다**(PLAT-02). 확인하지 않으면
+  // 사용자는 눌러도 안 되는 이유를 영영 알 수 없다 — 트레이 메뉴와 설정 화면에 적어 둔다.
+  // override로 한 자리만 바꿔 볼 수 있다(hotkey:set이 성공 여부를 보고 저장을 결정한다).
+  function applyHotkeys(override = {}) {
+    globalShortcut.unregisterAll();
+    failedShortcuts.length = 0;
+    const cur = { ...savedHotkeys(), ...override };
+    const taken = new Set();
+    ctx.hotkeys = {};
+    ctx.hotkeyOk = {};
+    for (const [key, def] of Object.entries(HOTKEY_ACTIONS)) {
+      const accel = String(cur[key] ?? '').trim();
+      ctx.hotkeys[key] = accel;
+      let ok = false;
+      // 같은 조합을 두 자리에 걸면 나중 것이 조용히 진다 — 아예 잡지 않고 실패로 적는다
+      if (accel && !taken.has(accel)) {
+        try {
+          ok = globalShortcut.register(accel, def.run) && globalShortcut.isRegistered(accel);
+        } catch {
+          ok = false; // 조합 문자열 자체가 잘못되면 register가 던진다
+        }
+      }
+      if (ok) taken.add(accel);
+      ctx.hotkeyOk[key] = ok;
+      if (accel && !ok) failedShortcuts.push({ accel: platform.hotkeyLabel(accel), label: def.label });
+    }
+    rebuildTrayMenu();
+    return ctx.hotkeyOk;
+  }
+
+  function bindHotkeys() {
+    ctx.applyHotkeys = applyHotkeys;
+    ctx.hotkeyLabels = () => {
+      const out = {};
+      for (const key of Object.keys(HOTKEY_ACTIONS)) out[key] = HOTKEY_ACTIONS[key].label;
+      return out;
+    };
+    applyHotkeys();
+  }
+
   function loadEvents() {
     const [from, to] = dayRange();
     return ctx.store.ok ? ctx.store.listBetween(from, to) : [];
@@ -190,11 +252,12 @@ export function bootstrap() {
     const t = tray ?? ctx.tray;
     if (!t) return;
 
+    const hk = (key) => (ctx.hotkeyOk?.[key] ? ` (${platform.hotkeyLabel(ctx.hotkeys[key])})` : '');
     const items = [
-      { label: '일정 보기', click: () => ctx.mainWindow.show() },
+      { label: `일정 보기${hk('window')}`, click: () => ctx.mainWindow.show() },
       { type: 'separator' },
       {
-        label: '오버레이 잠시 끄기',
+        label: `오버레이 잠시 끄기${hk('overlay')}`,
         type: 'checkbox',
         checked: ctx.overlay?.suspended ?? false,
         click: (item) => ctx.overlay.setSuspended(item.checked),
@@ -342,20 +405,9 @@ export function bootstrap() {
     setTimeout(pump, 4000);
     ctx.syncTimer = setInterval(pump, SYNC_INTERVAL_MS);
 
-    // register는 이미 잡힌 조합이면 **조용히 false를 돌려준다**(PLAT-02). 확인하지 않으면
-    // 사용자는 눌러도 안 되는 이유를 영영 알 수 없다 — 트레이 메뉴에 적어 둔다.
-    const bind = (accel, label, fn) => {
-      let ok = false;
-      try {
-        ok = globalShortcut.register(accel, fn) && globalShortcut.isRegistered(accel);
-      } catch {
-        ok = false;
-      }
-      if (!ok) failedShortcuts.push({ accel, label });
-      return ok;
-    };
-    bind('Ctrl+Alt+C', '창 열기·닫기', () => ctx.mainWindow.toggle());
-    bind('Ctrl+Alt+O', '오버레이 잠시 끄기', () => ctx.overlay.setSuspended(!ctx.overlay.suspended));
+    // 전역 단축키 — 기본 조합은 platform 표가 정하고, 사용자가 바꾼 값은 store의 setting 표에 있다.
+    // 설정 화면이 hotkey:set으로 바꾸면 여기서 만든 applyHotkeys가 다시 잡는다.
+    bindHotkeys();
 
     tick();
   });

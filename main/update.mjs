@@ -86,11 +86,27 @@ export function createUpdater({ onChange = () => {} } = {}) {
 
   const openReleases = () => shell.openExternal(RELEASES_URL);
 
+  // 설정 화면의 "지금 설치". 내려받아 둔 것이 있을 때만 재시작하며 갈아끼운다 —
+  // 평소 경로(끌 때 설치)를 대신하는 것이 아니라, 지금 당장 바꾸고 싶은 사람을 위한 문이다.
+  // macOS(manual)는 갈아끼울 수 없으니 받는 곳을 연다. 돌려주는 값이 무엇을 했는지 말한다.
+  function install() {
+    if (!supported) return { installing: false, opened: false };
+    if (state.status === 'manual') {
+      openReleases();
+      return { installing: false, opened: true };
+    }
+    if (state.status !== 'ready') return { installing: false, opened: false };
+    setImmediate(() => autoUpdater.quitAndInstall());
+    return { installing: true, opened: false };
+  }
+
   return {
     state,
     line: (current) => updateLine(state, current),
     check,
+    install,
     openReleases,
+    supported,
 
     // 트레이 메뉴에서 그 줄을 눌렀을 때. 상태에 따라 하는 일이 다르다 —
     // 새 버전을 찾아 둔 macOS에서는 확인을 한 번 더 하는 것이 아니라 받는 곳을 연다.

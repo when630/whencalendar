@@ -39,6 +39,18 @@ export const win32 = {
 
   dataDirLabel: '%APPDATA%\\whencalendar',
 
+  // 전역 단축키 기본값(PLAT-06). 사용자가 바꾼 값은 store의 setting 표(hotkeyWindow·hotkeyOverlay)에
+  // 있다. 빈 문자열이면 그 자리는 잡지 않는다.
+  // WHENWORK `Ctrl+Alt+Space`·WHENNOTE `Ctrl+Alt+M`·`N`·WHENMUSIC `Ctrl+Alt+S`·`P`·←·→와 겹치지 않는 조합.
+  hotkeys: { window: 'Control+Alt+C', overlay: 'Control+Alt+O' },
+
+  // 사람에게 보여줄 조합 표기 — 키캡에 새겨진 이름 그대로 적는다.
+  hotkeyLabel: (accel) =>
+    String(accel ?? '')
+      .replace(/\bCommandOrControl\b/g, 'Ctrl')
+      .replace(/\bControl\b/g, 'Ctrl')
+      .replace(/\b(Command|Super)\b/g, 'Win'),
+
   // 형제 앱 연동(D-33) — WHENCOMMAND가 "정말 설치돼 있나"를 확인할 경로. 개발 실행이면 설치본의 관례 경로를 적고,
   // 패키징본이면 실제 실행 파일(bundleFromExe) — Windows는 exe 그 자체다.
   link: {

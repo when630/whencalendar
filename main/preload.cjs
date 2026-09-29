@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('cal', {
 contextBridge.exposeInMainWorld('app', {
   settings: () => ipcRenderer.invoke('settings:get'),
   set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
+  // 전역 단축키 — 자리(window·overlay)와 Accelerator 문자열. 빈 문자열은 그 자리를 비운다
+  hotkeySet: (key, accel) => ipcRenderer.invoke('hotkey:set', { key, accel }),
+  // 업데이트 — 확인은 끝난 뒤 결과 줄을 돌려주고, 설치는 준비된 것이 있을 때만 재시작한다
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
   openDataDir: () => ipcRenderer.invoke('app:openDataDir'),
   exportJson: () => ipcRenderer.invoke('data:export'),
   exportIcs: () => ipcRenderer.invoke('data:exportIcs'),

@@ -8,6 +8,7 @@ import { parseLine, describe } from './parse.mjs';
 import { syncCalendar, syncAll } from './sync.mjs';
 import { findFreeSlots, formatSlots } from './free.mjs';
 import { buildIcs } from './ics.mjs';
+import { platform } from './platform/index.mjs';
 
 // 렌더러가 준 날짜 범위를 ISO로 바꾼다. 하루 경계는 로컬 자정이다 —
 // UTC로 자르면 한국에서 오전 9시 이전 일정이 전날로 밀린다.
@@ -241,7 +242,54 @@ export function registerIpc(ctx) {
       remindMin: st.getSetting('remindMin', 10),
       autoStart: app.getLoginItemSettings().openAtLogin,
       dataDir: path.dirname(st.file),
+      // 전역 단축키 — 지금 잡혀 있는 조합과 그 등록 성공 여부(PLAT-02). 표기는 main이 만든다.
+      platform: platform.id,
+      hotkeys: { ...(ctx.hotkeys ?? {}) },
+      hotkeyOk: { ...(ctx.hotkeyOk ?? {}) },
+      hotkeyLabels: Object.fromEntries(Object.entries(ctx.hotkeys ?? {}).map(([k, v]) => [k, platform.hotkeyLabel(v)])),
+      hotkeyDefaults: { ...platform.hotkeys },
+      update: updateInfo(),
     };
+  });
+
+  // 트레이 메뉴와 같은 문구(update-text.mjs updateLine) — 두 곳이 다른 말을 하면 어느 쪽이 맞는지 알 수 없다
+  function updateInfo() {
+    const u = ctx.updater;
+    const st = u?.state ?? { status: 'unsupported' };
+    return {
+      ...st,
+      current: app.getVersion(),
+      line: u ? u.line(app.getVersion()) : `버전 ${app.getVersion()}`,
+      // 설치본이 아니면 확인 자체가 없다. manual(macOS)은 받는 곳을 여는 것이 "설치"다.
+      supported: !!u?.supported,
+      manual: !!platform.update.manual,
+    };
+  }
+
+  // ── 업데이트 (REL-03). 확인은 끝날 때까지 기다렸다가 결과 줄을 돌려준다.
+  ipcMain.handle('update:check', async () => {
+    if (ctx.updater) await ctx.updater.check();
+    return { ok: true, ...updateInfo() };
+  });
+
+  // 준비된 것이 있으면 재시작하며 설치, macOS는 받는 곳 열기 — 돌려주는 값이 그 차이를 말한다
+  ipcMain.handle('update:install', () => ({ ok: true, ...(ctx.updater?.install() ?? { installing: false, opened: false }) }));
+
+  // PLAT-02: 조합을 바꾸면 **그 조합의 등록 성공 여부까지** 확인해서 돌려준다.
+  // 실패하면 저장하지 않고 이전 조합으로 되돌린다 — 저장해 두면 다음 실행에서도 안 잡히는
+  // 조합으로 조용히 시작한다. 빈 문자열은 "이 자리는 안 쓴다"라 실패가 아니다.
+  ipcMain.handle('hotkey:set', (_e, { key, accel } = {}) => {
+    if (!ctx.applyHotkeys || !ctx.hotkeys || !(key in ctx.hotkeys)) return { ok: false, error: '모르는 단축키 자리입니다' };
+    const next = String(accel ?? '').trim();
+    const prev = ctx.hotkeys[key];
+    const res = ctx.applyHotkeys({ [key]: next });
+    if (next && !res[key]) {
+      ctx.applyHotkeys({ [key]: prev });
+      return { ok: false, error: `${platform.hotkeyLabel(next)} 를 등록하지 못했습니다 — 다른 앱이 쓰고 있거나 잘못된 조합입니다. 이전 조합을 유지합니다` };
+    }
+    const settingKey = key === 'overlay' ? 'hotkeyOverlay' : 'hotkeyWindow';
+    if (store()?.ok) store().setSetting(settingKey, next);
+    return { ok: true, accel: next, label: platform.hotkeyLabel(next) };
   });
 
   ipcMain.handle('settings:set', (_e, { key, value }) => {

@@ -54,6 +54,7 @@ const state = {
   copyStyle: 0, // 0 목록 · 1 문장 · 2 표
   detail: false, // 오른쪽 상세 패널 (EV-04)
   settings: null,
+  hotkeyCapture: null, // { key, mods } — 설정 탭에서 단축키 조합을 누르는 중 (PLAT-02)
   ask: null, // { q, sub, opts, onPick } — 어디까지 바꿀지 묻는 창
   askCursor: 0,
 };
@@ -958,6 +959,95 @@ const REVEAL_START = [60, 45, 30, 20, 10];
 const REVEAL_FULL = [20, 15, 10, 5, 2];
 const RING_SIZES = [16, 20, 26];
 
+// ── 전역 단축키 (PLAT-02)
+//
+// "Control+Alt+C"를 타자로 치라는 건 Electron 표기법을 외우라는 말이다. 행에서 Enter를 누르면
+// 잡기 모드가 되고, 조합을 실제로 누르면 그 자리에서 읽어 main에 보낸다 — main이 등록까지 해 보고
+// 성공했을 때만 저장한다. Esc는 취소, Backspace는 비움(그 자리를 안 쓴다). 수식키 없는 키 하나는
+// 받지 않는다 — 전역 단축키가 맨 글자 하나를 가로채면 그 글자를 다른 앱에서 칠 수 없게 된다.
+const HOTKEY_ROWS = [
+  { key: 'window', label: '창 열기·닫기', sub: 'Enter를 누르고 원하는 조합을 그대로 누르세요 · Backspace로 비움' },
+  { key: 'overlay', label: '오버레이 잠시 끄기', sub: '회의 중 아일랜드가 방해될 때' },
+];
+
+function hotkeyValue(key) {
+  const st = state.settings ?? {};
+  if (state.hotkeyCapture?.key === key) {
+    const mods = state.hotkeyCapture.mods;
+    return mods.length ? `${accelLabel(mods, st.platform === 'darwin')} + …` : '누르세요… (Esc 취소)';
+  }
+  const label = st.hotkeyLabels?.[key] || '';
+  if (!st.hotkeys?.[key]) return '없음';
+  return st.hotkeyOk?.[key] === false ? `${label} — 등록 실패! 다른 조합으로` : label;
+}
+
+// KeyboardEvent.code → Electron 가속기 키 이름. 레이아웃에 흔들리지 않게 code를 쓴다
+// (key를 쓰면 한글 자판에서 'ㅁ' 같은 것이 온다).
+const CODE_TO_ACCEL = {
+  Space: 'Space', Enter: 'Return', NumpadEnter: 'Return', Tab: 'Tab', Delete: 'Delete', Insert: 'Insert',
+  Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown',
+  ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  Minus: '-', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';',
+  BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+};
+CODE_TO_ACCEL.Backquote = String.fromCharCode(96);
+CODE_TO_ACCEL.Quote = String.fromCharCode(39);
+function accelKeyOf(e) {
+  const code = e.code || '';
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+  if (/^Numpad[0-9]$/.test(code)) return 'num' + code.slice(6);
+  return CODE_TO_ACCEL[code] ?? null;
+}
+function accelModsOf(e, isMac) {
+  const mods = [];
+  if (e.ctrlKey) mods.push('Control');
+  if (e.altKey) mods.push('Alt');
+  if (e.shiftKey) mods.push('Shift');
+  if (e.metaKey) mods.push(isMac ? 'Command' : 'Super');
+  return mods;
+}
+// 미리보기용 사람 표기 — main의 platform.hotkeyLabel과 같은 규칙을 화면에서 흉내낸다
+function accelLabel(parts, isMac) {
+  if (isMac) {
+    const m = { Control: '⌃', Alt: '⌥', Shift: '⇧', Command: '⌘' };
+    return parts.map((x) => m[x] ?? x).join('');
+  }
+  return parts.map((x) => (x === 'Control' ? 'Ctrl' : x === 'Super' ? 'Win' : x)).join('+');
+}
+
+async function finishHotkeyCapture(accel) {
+  const cap = state.hotkeyCapture;
+  state.hotkeyCapture = null;
+  if (!cap || accel === null) return renderSettings();
+  const r = await window.app.hotkeySet(cap.key, accel);
+  if (!r.ok) toast(r.error ?? '단축키를 등록하지 못했습니다');
+  else toast(accel ? `단축키 ${r.label} 로 바뀌었습니다` : '단축키를 비웠습니다');
+  await loadSettings();
+}
+
+async function onHotkeyCaptureKey(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const isMac = state.settings?.platform === 'darwin';
+  if (e.key === 'Escape') return finishHotkeyCapture(null);
+  const mods = accelModsOf(e, isMac);
+  if (e.code === 'Backspace' && !mods.length) return finishHotkeyCapture('');
+  const key = accelKeyOf(e);
+  if (!key) {
+    // 수식키만 눌린 상태 — 여기까지 잡혔다고 보여 준다
+    state.hotkeyCapture.mods = mods;
+    renderSettings();
+    return;
+  }
+  if (!mods.length) {
+    toast('Ctrl·Alt·Shift 중 하나는 함께 누르세요');
+    return;
+  }
+  return finishHotkeyCapture([...mods, key].join('+'));
+}
+
 function settingRows() {
   const st = state.settings ?? {};
   return [
@@ -991,6 +1081,8 @@ function settingRows() {
       label: '몇 분 전에',
       opts: [5, 10, 15, 30, 60].map((m) => ({ v: m, label: `${m}분` })),
     },
+    { grp: '단축키' },
+    ...HOTKEY_ROWS.map((r) => ({ ...r, kind: 'hotkey', val: hotkeyValue(r.key) })),
     { grp: '일반' },
     {
       key: 'autoStart',
@@ -999,6 +1091,15 @@ function settingRows() {
       opts: [{ v: true, label: '켬' }, { v: false, label: '끔' }],
     },
     { action: 'openDir', label: '데이터 폴더', sub: st.dataDir ?? '', val: '열기' },
+    { grp: '업데이트' },
+    // 트레이 메뉴와 같은 줄. 상태에 따라 할 일이 하나뿐이라 확인과 설치를 한 행에 둔다 —
+    // 준비됐으면 지금 설치, macOS에서 새 버전을 찾았으면 받는 곳 열기, 아니면 지금 확인.
+    {
+      action: 'update',
+      label: st.update?.line ?? `버전 ${st.update?.current ?? ''}`,
+      sub: st.update?.supported === false ? '개발 실행에서는 확인하지 않습니다' : '하루에 한 번 알아서 확인하고, 받아 둔 것은 종료할 때 설치합니다',
+      val: updateActionLabel(st.update),
+    },
     { grp: '데이터' },
     { action: 'exportJson', label: '전체 내보내기', sub: 'JSON 한 파일', val: 'Enter' },
     { action: 'exportIcs', label: '.ics로 내보내기', sub: '다른 캘린더가 읽는 표준 형식', val: 'Enter' },
@@ -1007,6 +1108,30 @@ function settingRows() {
 }
 
 const settingItems = () => settingRows().filter((r) => !r.grp);
+
+function updateActionLabel(u) {
+  if (!u || u.supported === false) return '—';
+  if (u.status === 'ready') return '지금 설치';
+  if (u.status === 'manual') return '받는 곳 열기';
+  if (u.status === 'checking' || u.status === 'downloading' || u.status === 'available') return '진행 중';
+  return '지금 확인';
+}
+
+async function runUpdate() {
+  const u = state.settings?.update ?? {};
+  if (u.supported === false) return toast('업데이트 확인은 설치본에서만 동작합니다');
+  if (u.status === 'ready' || u.status === 'manual') {
+    const r = await window.app.updateInstall();
+    if (r.opened) toast('받는 곳을 열었습니다 — 내려받아 덮어써 주세요');
+    else if (!r.installing) toast('아직 설치할 것이 준비되지 않았습니다');
+    return;
+  }
+  if (u.status === 'checking' || u.status === 'downloading') return;
+  toast('업데이트 확인 중…');
+  const r = await window.app.updateCheck();
+  await loadSettings();
+  toast(r.line ?? '확인했습니다');
+}
 
 function renderSettings() {
   setDateLabel('');
@@ -1067,6 +1192,10 @@ function renderSettings() {
     } else {
       const v = document.createElement('span');
       v.className = 'val';
+      if (r.kind === 'hotkey') {
+        const capturing = state.hotkeyCapture?.key === r.key;
+        v.className += capturing ? ' cap' : st.hotkeys?.[r.key] && st.hotkeyOk?.[r.key] === false ? ' bad' : '';
+      }
       v.textContent = r.val ?? '';
       row.append(v);
     }
@@ -1083,6 +1212,11 @@ async function loadSettings() {
 }
 
 async function settingAction(item, dir) {
+  if (item.kind === 'hotkey') {
+    state.hotkeyCapture = { key: item.key, mods: [] };
+    renderSettings();
+    return;
+  }
   if (item.opts) {
     const cur = state.settings[item.key];
     const i = item.opts.findIndex((o) => o.v === cur);
@@ -1095,6 +1229,7 @@ async function settingAction(item, dir) {
     return;
   }
   if (item.action === 'openDir') return void window.app.openDataDir();
+  if (item.action === 'update') return runUpdate();
   if (item.action === 'exportJson') {
     const r = await window.app.exportJson();
     if (r.ok) toast('내보냈습니다');
@@ -1551,6 +1686,15 @@ el.searchIn.addEventListener('input', () => {
   }, 120);
 });
 
+document.addEventListener('keyup', (e) => {
+  if (!state.hotkeyCapture) return;
+  const mods = accelModsOf(e, state.settings?.platform === 'darwin');
+  if (mods.length !== state.hotkeyCapture.mods.length) {
+    state.hotkeyCapture.mods = mods;
+    renderSettings();
+  }
+});
+
 el.searchIn.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault();
@@ -1559,6 +1703,9 @@ el.searchIn.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keydown', async (e) => {
+  // 단축키를 잡는 중이면 어떤 키든 조합으로 읽는다 — j/k·Esc도 여기서는 글자다
+  if (state.hotkeyCapture) return onHotkeyCaptureKey(e);
+
   // 검색은 입력창이 포커스를 가지므로 여기서는 Esc만 본다
   if (state.view === 'search' && document.activeElement === el.searchIn) return;
 
