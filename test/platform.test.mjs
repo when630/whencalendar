@@ -55,9 +55,47 @@ test('모르는 OS는 Windows 표로 떨어진다 — 개발 실행이 죽지 �
 test('두 표의 열쇠가 같다', () => {
   const keys = (o) => Object.keys(o).sort();
   assert.deepEqual(keys(darwin), keys(win32));
-  for (const group of ['tray', 'overlay', 'update']) {
+  for (const group of ['tray', 'overlay', 'update', 'window']) {
     assert.deepEqual(keys(darwin[group]), keys(win32[group]), group);
   }
+});
+
+// Windows는 hide()만으로는 직전 창에 포커스가 돌아오지 않는다 — minimize()를 거쳐 숨기고, 그래서 보일 때 restore()가 먼저다.
+// restore() 뒤에 show()를 빼면 렌더러가 프레임을 내지 않아 화면이 굳는다(whencommand D-29). 호출 순서를 가짜 창으로 센다.
+test('Windows는 minimize→hide로 숨기고 restore→show→focus로 보인다 (D-34)', () => {
+  const fake = (minimized) => {
+    const calls = [];
+    return {
+      calls,
+      isMinimized: () => minimized,
+      minimize: () => { calls.push('minimize'); minimized = true; },
+      restore: () => { calls.push('restore'); minimized = false; },
+      show: () => calls.push('show'),
+      hide: () => calls.push('hide'),
+      focus: () => calls.push('focus'),
+    };
+  };
+
+  let w = fake(false);
+  win32.window.deactivate(w);
+  assert.deepEqual(w.calls, ['minimize', 'hide']);
+  w = fake(true);
+  win32.window.deactivate(w);
+  assert.deepEqual(w.calls, ['hide'], '이미 최소화된 창은 다시 최소화하지 않는다 — blur 핸들러가 재진입해도 안전해야 한다');
+  w = fake(true);
+  win32.window.activate(w);
+  assert.deepEqual(w.calls, ['restore', 'show', 'focus']);
+  w = fake(false);
+  win32.window.activate(w);
+  assert.deepEqual(w.calls, ['show', 'focus']);
+
+  // macOS는 hide()로 직전 앱에 돌아간다 — app.hide()는 오버레이까지 숨기므로 쓰지 않는다
+  w = fake(false);
+  darwin.window.deactivate(w);
+  assert.deepEqual(w.calls, ['hide']);
+  w = fake(true);
+  darwin.window.activate(w);
+  assert.deepEqual(w.calls, ['restore', 'show', 'focus']);
 });
 
 test('메뉴 막대는 Template 아이콘을 먼저 찾고, 트레이는 색이 든 것을 쓴다', () => {

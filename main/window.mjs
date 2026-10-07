@@ -5,6 +5,7 @@
 import { BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { platform } from './platform/index.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,11 +54,11 @@ export function createMainWindow(settings) {
     win.on('moved', remember);
     win.on('resized', remember);
 
-    // 닫기는 숨기기다. 앱은 트레이에 남는다.
+    // 닫기는 숨기기다. 앱은 트레이에 남는다. 숨기는 순서는 platform이 안다 — 직전 창으로 포커스를 돌려준다(D-34)
     win.on('close', (e) => {
       if (win.__reallyClose) return;
       e.preventDefault();
-      win.hide();
+      platform.window.deactivate(win);
     });
   }
 
@@ -66,15 +67,15 @@ export function createMainWindow(settings) {
       return win;
     },
 
+    // 보이기·숨기기의 순서는 platform이 안다(D-34) — Windows는 숨길 때 minimize()를 거쳐야 직전 창에 포커스가
+    // 돌아오고, 그래서 보일 때 restore()→show()→focus() 순이다. Esc·×·트레이 토글·단축키가 전부 이 둘을 탄다
     show() {
       if (!win || win.isDestroyed()) build();
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
+      platform.window.activate(win);
     },
 
     hide() {
-      if (win && !win.isDestroyed()) win.hide();
+      if (win && !win.isDestroyed()) platform.window.deactivate(win);
     },
 
     // 보이기만 하면 끄는 것이 아니라 **포커스까지 있을 때만** 끈다.

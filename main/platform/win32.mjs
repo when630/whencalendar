@@ -37,6 +37,23 @@ export const win32 = {
     manual: false,
   },
 
+  // 본체 창을 보이고 숨기는 순서(D-34). **`hide()`만으로는 직전 창에 포커스가 돌아오지 않는다** —
+  // 창을 숨기면 OS가 Z순서에서 아무 창이나 고른다(whencommand 실측 2026-09-21). 숨기기 전에 `minimize()`를
+  // 거치면 최소화의 정규 활성화 경로가 직전 포그라운드 창을 복귀시킨다. 최소화된 창은 `isVisible()=false`라
+  // 보일 때는 `restore()`가 먼저고, 그 뒤 `show()`를 **반드시** 부른다 — restore만으로는 렌더러가 프레임을
+  // 내지 않아 직전 화면이 굳은 채 키를 안 받는다(whencommand D-29).
+  window: {
+    activate(win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    },
+    deactivate(win) {
+      if (!win.isMinimized()) win.minimize();
+      win.hide();
+    },
+  },
+
   dataDirLabel: '%APPDATA%\\whencalendar',
 
   // 전역 단축키 기본값(PLAT-06). 사용자가 바꾼 값은 store의 setting 표(hotkeyWindow·hotkeyOverlay)에

@@ -54,6 +54,19 @@ export const darwin = {
     manual: true,
   },
 
+  // 본체 창을 보이고 숨기는 순서(D-34). macOS는 `hide()`로 직전 앱에 포커스가 돌아간다 — 최소화를 거치지 않는다.
+  // `app.hide()`는 쓰지 않는다 — 오버레이까지 함께 사라진다. (실기기 미검증)
+  window: {
+    activate(win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    },
+    deactivate(win) {
+      win.hide();
+    },
+  },
+
   dataDirLabel: '~/Library/Application Support/whencalendar',
 
   // 전역 단축키 기본값. Windows와 같은 값을 쓴다 — 형제 앱과 조합표를 하나로 외우게 두려고.
