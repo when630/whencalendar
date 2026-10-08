@@ -71,7 +71,8 @@ export function displayLabel(d, index, primaryId) {
   return `${index + 1} · ${name}${size}${d.id === primaryId ? ' (주)' : ''}`;
 }
 
-// ── 격자 범위. 월요일 시작이고, 그 달이 몇 주를 쓰는지에 따라 4~6줄이다(본체 월 탭은 늘 6줄, 위젯은 칸을 키우려 줄을 줄인다)
+// ── 격자 범위. 한 주 시작은 설정(weekStart: 0=일요일 기본, 1=월요일)이고, 그 달이 몇 주를 쓰는지에 따라 4~6줄이다
+// (본체 월 탭은 늘 6줄, 위젯은 칸을 키우려 줄을 줄인다)
 function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -80,17 +81,16 @@ function addDays(d, n) {
   x.setDate(x.getDate() + n);
   return x;
 }
-function mondayOf(d) {
+export function weekStartOf(d, weekStart = 0) {
   const x = startOfDay(d);
-  const dow = x.getDay();
-  return addDays(x, dow === 0 ? -6 : 1 - dow);
+  return addDays(x, -((x.getDay() - weekStart + 7) % 7));
 }
 
-/** 이 달의 격자 — 시작(월요일 0시), 줄 수, 조회 범위(끝은 배타적). */
-export function monthGrid(now) {
+/** 이 달의 격자 — 시작(주 첫날 0시), 줄 수, 조회 범위(끝은 배타적). */
+export function monthGrid(now, weekStart = 0) {
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const start = mondayOf(first);
+  const start = weekStartOf(first, weekStart);
   const days = Math.round((startOfDay(last) - start) / 86_400_000) + 1;
   const weeks = Math.ceil(days / 7);
   return { start, weeks, end: addDays(start, weeks * 7) };

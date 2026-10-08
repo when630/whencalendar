@@ -54,6 +54,7 @@ const state = {
   copyStyle: 0, // 0 목록 · 1 문장 · 2 표
   detail: false, // 오른쪽 상세 패널 (EV-04)
   settings: null,
+  weekStart: 0, // 0=일요일 · 1=월요일. 설정에서 받는다 — 첫 그리기 전에 읽는다
   hotkeyCapture: null, // { key, mods } — 설정 탭에서 단축키 조합을 누르는 중 (PLAT-02)
   ask: null, // { q, sub, opts, onPick } — 어디까지 바꿀지 묻는 창
   askCursor: 0,
@@ -79,10 +80,14 @@ function addDays(d, n) {
   x.setDate(x.getDate() + n);
   return x;
 }
-function mondayOf(d) {
+// 한 주의 첫날. 설정 '한 주 시작'(기본 일요일)을 따른다 — 주 탭·월 격자·위젯이 같은 값을 본다
+function weekStartOf(d) {
   const x = startOfDay(d);
-  const dow = x.getDay();
-  return addDays(x, dow === 0 ? -6 : 1 - dow);
+  return addDays(x, -((x.getDay() - state.weekStart + 7) % 7));
+}
+// 월 격자 머리글 — WEEK를 한 주 시작만큼 돌린 것
+function dowLabels() {
+  return Array.from({ length: 7 }, (_, i) => (i + state.weekStart) % 7);
 }
 function hm(d) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -293,7 +298,7 @@ function renderToday(now) {
 }
 
 function renderWeek(now) {
-  const mon = mondayOf(state.anchor);
+  const mon = weekStartOf(state.anchor);
   const sun = addDays(mon, 6);
   setDateLabel(
     `${mon.getMonth() + 1}월 ${mon.getDate()}일 – ${sun.getMonth() + 1}월 ${sun.getDate()}일`,
@@ -355,7 +360,7 @@ function daySpan(ev) {
 }
 
 function monthGridStart(anchor) {
-  return mondayOf(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
+  return weekStartOf(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
 }
 
 // 기간 일정은 칸 위를 지나는 3px 선으로 잇는다. 선 넷이 겹쳐도 22px이면 되므로,
@@ -392,10 +397,10 @@ function renderMonth(now) {
 
   const dow = document.createElement('div');
   dow.className = 'dow';
-  ['월', '화', '수', '목', '금', '토', '일'].forEach((d, i) => {
+  dowLabels().forEach((day) => {
     const sp = document.createElement('span');
-    if (i >= 5) sp.className = 'we';
-    sp.textContent = d;
+    if (day === 0 || day === 6) sp.className = 'we';
+    sp.textContent = WEEK[day];
     dow.append(sp);
   });
   wrap.append(dow);
@@ -438,7 +443,7 @@ function renderMonth(now) {
       // **뒤 날짜들이 옆으로 밀려 사라진다** — 실제로 18~20일이 없어졌다.
       c.style.gridColumn = `${d + 1} / ${d + 2}`;
       if (day.getMonth() !== anchor.getMonth()) c.classList.add('out');
-      if (d >= 5) c.classList.add('we');
+      if (day.getDay() === 0 || day.getDay() === 6) c.classList.add('we');
       if (sameDay(day, now)) c.classList.add('today');
       if (sameDay(day, state.anchor)) c.classList.add('sel');
       c.dataset.day = day.toISOString();
@@ -1115,6 +1120,12 @@ function settingRows() {
     ...HOTKEY_ROWS.map((r) => ({ ...r, kind: 'hotkey', val: hotkeyValue(r.key) })),
     { grp: '일반' },
     {
+      key: 'weekStart',
+      label: '한 주 시작',
+      sub: '주·월 탭과 바탕화면 위젯이 함께 따른다',
+      opts: [{ v: 0, label: '일요일' }, { v: 1, label: '월요일' }],
+    },
+    {
       key: 'autoStart',
       label: '로그인할 때 자동 시작',
       sub: '설치본에서만 동작합니다',
@@ -1238,6 +1249,7 @@ function renderSettings() {
 
 async function loadSettings() {
   state.settings = await window.app.settings();
+  state.weekStart = state.settings?.weekStart ?? 0;
   renderSettings();
 }
 
@@ -1499,7 +1511,7 @@ async function load() {
 
   if (state.tab === 'set') {
     const today = await window.cal.list({ day: new Date().toISOString(), days: 1 });
-    const week = await window.cal.list({ day: mondayOf(new Date()).toISOString(), days: 7 });
+    const week = await window.cal.list({ day: weekStartOf(new Date()).toISOString(), days: 7 });
     state.subs = await window.subs.list();
     renderTabs({
       today: today.events?.length ?? 0,
@@ -1516,7 +1528,7 @@ async function load() {
     const subs = state.subs.filter((c) => c.kind === 'subscription');
     if (state.cursor >= subs.length) state.cursor = Math.max(0, subs.length - 1);
     const today = await window.cal.list({ day: new Date().toISOString(), days: 1 });
-    const week = await window.cal.list({ day: mondayOf(new Date()).toISOString(), days: 7 });
+    const week = await window.cal.list({ day: weekStartOf(new Date()).toISOString(), days: 7 });
     renderTabs({ today: today.events?.length ?? 0, week: week.events?.length ?? 0, subs: subs.length });
     renderSubs();
     return;
@@ -1527,7 +1539,7 @@ async function load() {
       ? { day: state.anchor.toISOString(), days: 1 }
       : state.tab === 'month'
         ? { day: monthGridStart(state.anchor).toISOString(), days: 42 }
-        : { day: mondayOf(state.anchor).toISOString(), days: 7 };
+        : { day: weekStartOf(state.anchor).toISOString(), days: 7 };
 
   const res = await window.cal.list(opts);
   state.events = res.events ?? [];
@@ -1535,7 +1547,7 @@ async function load() {
 
   // 탭 배지 — 오늘은 오늘 건수, 주는 이번 주 건수
   const today = await window.cal.list({ day: new Date().toISOString(), days: 1 });
-  const week = await window.cal.list({ day: mondayOf(new Date()).toISOString(), days: 7 });
+  const week = await window.cal.list({ day: weekStartOf(new Date()).toISOString(), days: 7 });
   renderTabs({
     today: today.events?.length ?? 0,
     week: week.events?.length ?? 0,
@@ -2192,7 +2204,14 @@ setInterval(() => {
 }, 30_000);
 
 refreshInfo();
-load();
+// 한 주 시작은 첫 그리기 전에 알아야 한다 — 설정을 못 읽어도 기본값(일요일)으로 그린다
+window.app
+  .settings()
+  .then((st) => {
+    state.weekStart = st?.weekStart ?? 0;
+  })
+  .catch(() => {})
+  .finally(load);
 
 // ── 형제 앱 연동(D-33) — WHENCOMMAND가 whencalendar://<명령>?<인자> 로 부른다. 창은 메인이 이미 보였다.
 //   add    한 줄을 새 일정 대화상자에 채운다 — 읽은 결과(미리보기)를 보고 Enter로 확정한다. 확인 없이 넣지 않는다

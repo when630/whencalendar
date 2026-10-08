@@ -239,12 +239,14 @@ export function bootstrap() {
   // 바탕화면 위젯에 보낼 한 달치(WGT-02). 격자가 보이는 주만 — 4~6주
   function widgetPayload() {
     const now = new Date();
-    const g = monthGrid(now);
+    const weekStart = ctx.store.ok ? ctx.store.getSetting('weekStart', 0) : 0;
+    const g = monthGrid(now, weekStart);
     const events = ctx.store.ok ? ctx.store.listBetween(g.start.toISOString(), g.end.toISOString()) : [];
     return {
       now: now.toISOString(),
       start: g.start.toISOString(),
       weeks: g.weeks,
+      weekStart,
       events: events.map((ev) => ({ title: ev.title, startsAt: ev.startsAt, endsAt: ev.endsAt, allDay: !!ev.allDay, color: ev.color ?? null })),
     };
   }

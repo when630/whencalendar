@@ -240,6 +240,7 @@ export function registerIpc(ctx) {
       endSoonEnabled: st.getSetting('endSoonEnabled', true),
       ringSize: st.getSetting('ringSize', 20),
       osNotify: st.getSetting('osNotify', false),
+      weekStart: st.getSetting('weekStart', 0), // 0=일요일(기본) · 1=월요일 — 본체 주·월 탭과 위젯이 함께 따른다
       remindMin: st.getSetting('remindMin', 10),
       autoStart: app.getLoginItemSettings().openAtLogin,
       dataDir: path.dirname(st.file),

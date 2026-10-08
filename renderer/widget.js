@@ -2,7 +2,7 @@
 //
 // 조작은 둘뿐이다 — 끌어서 옮기기, 클릭해서 본체 월 탭 열기. 끌기의 좌표는 main이 커서로 재므로
 // 여기서는 "시작·이동·끝"만 알린다. 클릭과 끌기는 움직인 거리로 가른다.
-const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
+const DAYS = ['일', '월', '화', '수', '목', '금', '토']; // getDay() 순서. 머리글은 weekStart만큼 돌려 쓴다
 const CLICK_PX = 4;
 const MAX_PINS = 8; // 상한일 뿐이다 — 실제 줄 수는 fit()이 칸 높이로 정한다
 
@@ -43,14 +43,17 @@ function daySpan(ev) {
   return { from: s, to: e };
 }
 
-el.dow.replaceChildren(
-  ...WEEK.map((d, i) => {
-    const sp = document.createElement('span');
-    if (i >= 5) sp.className = 'we';
-    sp.textContent = d;
-    return sp;
-  })
-);
+function renderDow(weekStart) {
+  el.dow.replaceChildren(
+    ...DAYS.map((_, i) => {
+      const day = (i + weekStart) % 7;
+      const sp = document.createElement('span');
+      if (day === 0 || day === 6) sp.className = 'we';
+      sp.textContent = DAYS[day];
+      return sp;
+    })
+  );
+}
 
 function render(p) {
   // 크기 단계에 따라 글자·여백을 함께 키운다. 창 크기는 main이 정했고 여기선 배율만 받는다
@@ -58,7 +61,8 @@ function render(p) {
   const now = new Date(p.now);
   const start = new Date(p.start);
   el.title.textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
-  el.sub.textContent = `오늘 ${now.getDate()}일 (${WEEK[(now.getDay() + 6) % 7]})`;
+  el.sub.textContent = `오늘 ${now.getDate()}일 (${DAYS[now.getDay()]})`;
+  renderDow(p.weekStart ?? 0);
 
   // 날짜별로 모은다. 여러 날에 걸친 것은 덮는 날마다 적되 시각은 첫날에만
   const byDay = new Map();
@@ -77,7 +81,7 @@ function render(p) {
     const c = document.createElement('div');
     c.className = 'c';
     if (day.getMonth() !== now.getMonth()) c.classList.add('out');
-    if (i % 7 >= 5) c.classList.add('we');
+    if (day.getDay() === 0 || day.getDay() === 6) c.classList.add('we');
     if (sameDay(day, now)) c.classList.add('today');
 
     const head = document.createElement('div');
