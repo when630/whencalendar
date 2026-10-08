@@ -1,7 +1,7 @@
 // 바탕화면 위젯의 자리 계산(WGT). 창 없이 돈다 — widget-layout은 electron을 모른다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WIDGET_W, WIDGET_H, pickDisplay, clampPos, boundsFor, relativeTo, displayContaining, displayLabel, monthGrid } from '../main/widget-layout.mjs';
+import { WIDGET_W, WIDGET_H, SIZES, DEFAULT_SIZE, sizeOf, zoomOf, pickDisplay, clampPos, boundsFor, relativeTo, displayContaining, displayLabel, monthGrid } from '../main/widget-layout.mjs';
 
 const D1 = { id: 1, label: 'DELL U2720Q', bounds: { x: 0, y: 0, width: 2560, height: 1440 }, workArea: { x: 0, y: 0, width: 2560, height: 1392 } };
 const D2 = { id: 2, label: '', bounds: { x: 2560, y: 0, width: 1920, height: 1080 }, workArea: { x: 2560, y: 0, width: 1920, height: 1032 } };
@@ -54,4 +54,23 @@ test('월 격자는 월요일에서 시작하고 그 달이 쓰는 주만 센다
   assert.equal(monthGrid(new Date(2027, 1, 1)).weeks, 4);
   // 2026년 8월: 1일이 토요일, 31일(월) → 6주
   assert.equal(monthGrid(new Date(2026, 7, 15)).weeks, 6);
+});
+
+test('크기 단계는 넷이고 기본은 보통(760×600), 모르는 값은 기본으로 (WGT-05)', () => {
+  assert.deepEqual(Object.keys(SIZES), ['small', 'normal', 'large', 'xlarge']);
+  assert.deepEqual(SIZES.xlarge, { width: 1200, height: 960 });
+  assert.equal(DEFAULT_SIZE, 'normal');
+  assert.deepEqual(SIZES.normal, { width: 760, height: 600 });
+  assert.deepEqual(sizeOf('large'), SIZES.large);
+  assert.deepEqual(sizeOf(undefined), SIZES.normal);
+  assert.deepEqual(sizeOf('huge'), SIZES.normal, '모르는 값은 기본');
+  assert.deepEqual({ width: WIDGET_W, height: WIDGET_H }, SIZES.normal);
+  // 배율은 가로 비율의 제곱근 — 글자는 커지되 칸엔 더 많은 줄이 들어간다
+  assert.equal(zoomOf(SIZES.small), 1);
+  assert.ok(zoomOf(SIZES.normal) > 1 && zoomOf(SIZES.normal) < SIZES.normal.width / SIZES.small.width);
+  assert.ok(zoomOf(SIZES.large) > zoomOf(SIZES.normal));
+  assert.ok(zoomOf(SIZES.xlarge) > zoomOf(SIZES.large));
+  // 크기를 넘기면 그 크기로 자리를 잡는다
+  const b = boundsFor({ x: 40, y: 60 }, { workArea: { x: 0, y: 0, width: 2560, height: 1392 } }, SIZES.large);
+  assert.deepEqual(b, { x: 40, y: 60, width: 980, height: 780 });
 });

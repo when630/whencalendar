@@ -1091,6 +1091,17 @@ function settingRows() {
     ...(st.widgetEnabled && st.widgetDisplays?.length
       ? [
           {
+            key: 'widgetSize',
+            label: '크기',
+            sub: '커질수록 글자도 커지고 칸에 더 많은 줄이 들어간다',
+            opts: [
+              { v: 'small', label: '작게' },
+              { v: 'normal', label: '보통' },
+              { v: 'large', label: '크게' },
+              { v: 'xlarge', label: '아주 크게' },
+            ],
+          },
+          {
             key: 'widgetDisplayId',
             label: '모니터',
             sub: '바꾸면 그 모니터의 오른쪽 위로 간다',

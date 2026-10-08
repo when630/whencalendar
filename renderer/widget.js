@@ -4,7 +4,7 @@
 // 여기서는 "시작·이동·끝"만 알린다. 클릭과 끌기는 움직인 거리로 가른다.
 const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
 const CLICK_PX = 4;
-const MAX_PINS = 3;
+const MAX_PINS = 8; // 상한일 뿐이다 — 실제 줄 수는 fit()이 칸 높이로 정한다
 
 const el = {
   card: document.getElementById('card'),
@@ -53,6 +53,8 @@ el.dow.replaceChildren(
 );
 
 function render(p) {
+  // 크기 단계에 따라 글자·여백을 함께 키운다. 창 크기는 main이 정했고 여기선 배율만 받는다
+  document.documentElement.style.zoom = String(p.zoom ?? 1);
   const now = new Date(p.now);
   const start = new Date(p.start);
   el.title.textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;

@@ -104,9 +104,11 @@
         color: #8a6f78;
       }
 
+      /* 줄 높이는 내용이 아니라 창이 정한다 — 안 그러면 일정 많은 주만 키가 커져 격자가 울퉁불퉁하다 */
       .cells {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
+        grid-auto-rows: minmax(0, 1fr);
         gap: 3px;
         flex: 1;
         min-height: 0;
@@ -157,10 +159,10 @@
         color: var(--text-muted);
       }
       /* 일정 한 줄 — "제목 시각". 칸이 좁으니 시각은 뒤에 작게 */
-      /* 제목은 두 줄까지 — 칸이 좁아 한 줄이면 "다가오…"만 남는다. 더 길면 말줄임 */
+      /* 일정 한 줄은 한 줄이다 — 길면 …으로 자른다. 줄바꿈하면 칸마다 줄 수가 달라져 격자가 어수선하다 */
       .pin {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 3px;
         flex: none;
         font-size: 10px;
@@ -173,15 +175,12 @@
         height: 8px;
         border-radius: 2px;
         flex: none;
-        margin-top: 3px;
       }
       .pin .t {
         min-width: 0;
         overflow: hidden;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        word-break: break-all;
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
       .pin .h {
         flex: none;

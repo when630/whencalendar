@@ -9,6 +9,7 @@ import { syncCalendar, syncAll } from './sync.mjs';
 import { findFreeSlots, formatSlots } from './free.mjs';
 import { buildIcs } from './ics.mjs';
 import { platform } from './platform/index.mjs';
+import { DEFAULT_SIZE } from './widget-layout.mjs';
 
 // 렌더러가 준 날짜 범위를 ISO로 바꾼다. 하루 경계는 로컬 자정이다 —
 // UTC로 자르면 한국에서 오전 9시 이전 일정이 전날로 밀린다.
@@ -244,6 +245,7 @@ export function registerIpc(ctx) {
       dataDir: path.dirname(st.file),
       // 바탕화면 위젯(WGT) — 켬·끔과 모니터 목록. 어느 모니터가 지금 것인지는 목록이 말한다
       widgetEnabled: st.getSetting('widgetEnabled', false),
+      widgetSize: st.getSetting('widgetSize', DEFAULT_SIZE),
       widgetDisplays: ctx.widget?.displays() ?? [],
       widgetActive: !!ctx.widget?.active,
       // 전역 단축키 — 지금 잡혀 있는 조합과 그 등록 성공 여부(PLAT-02). 표기는 main이 만든다.
@@ -299,6 +301,11 @@ export function registerIpc(ctx) {
   ipcMain.handle('settings:set', (_e, { key, value }) => {
     if (key === 'widgetEnabled') {
       ctx.setWidgetEnabled?.(!!value);
+      return { ok: true };
+    }
+    if (key === 'widgetSize') {
+      store()?.setSetting('widgetSize', value);
+      ctx.widget?.resize();
       return { ok: true };
     }
     if (key === 'widgetDisplayId') {

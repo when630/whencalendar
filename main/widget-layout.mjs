@@ -3,9 +3,26 @@
 // 위치는 "어느 모니터의 작업 영역 왼쪽 위에서 얼마나"로 저장한다. 모니터가 빠지면 주 모니터로 떨어지고,
 // 저장된 자리가 화면 밖이면 안으로 당긴다 — 해상도가 바뀌어 위젯이 영영 안 보이는 일이 없게.
 
-export const WIDGET_W = 560;
-export const WIDGET_H = 440;
+// 크기 단계(WGT-05). 바탕화면은 넓다 — 보통이 760×600이다. 커질수록 글자도 커지되(zoom) 비례보다 덜 키워
+// 칸에 더 많은 줄이 들어가게 한다. 가로 560(작게)이 zoom 1의 기준이다
+export const SIZES = {
+  small: { width: 560, height: 440 },
+  normal: { width: 760, height: 600 },
+  large: { width: 980, height: 780 },
+  xlarge: { width: 1200, height: 960 },
+};
+export const DEFAULT_SIZE = 'normal';
+export const WIDGET_W = SIZES[DEFAULT_SIZE].width;
+export const WIDGET_H = SIZES[DEFAULT_SIZE].height;
 const MARGIN = 24;
+
+export function sizeOf(key) {
+  return SIZES[key] ?? SIZES[DEFAULT_SIZE];
+}
+
+export function zoomOf(size) {
+  return Math.round(Math.sqrt(size.width / SIZES.small.width) * 100) / 100;
+}
 
 /** 저장된 모니터 id가 있으면 그것, 없거나 사라졌으면 주 모니터. */
 export function pickDisplay(displays, wantedId, primaryId) {

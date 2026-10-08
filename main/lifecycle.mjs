@@ -11,7 +11,7 @@ import { createSettings } from './settings.mjs';
 import { createOverlay } from './overlay.mjs';
 import { createMainWindow } from './window.mjs';
 import { createWidget } from './widget.mjs';
-import { monthGrid } from './widget-layout.mjs';
+import { monthGrid, DEFAULT_SIZE } from './widget-layout.mjs';
 import { registerIpc } from './ipc.mjs';
 import { stateAt, msUntilNextChange, DEFAULTS, dueReminders, remindText } from './clock.mjs';
 import { syncAll, SYNC_INTERVAL_MS } from './sync.mjs';
@@ -390,7 +390,11 @@ export function bootstrap() {
     ctx.overlay.start();
     ctx.mainWindow = createMainWindow(ctx.settings);
     // 바탕화면 위젯(WGT) — 클릭하면 본체 월 탭. 켜 둔 사람에게만 뜬다
-    ctx.widget = createWidget({ settings: ctx.settings, onOpen: () => ctx.mainWindow.showTab('month') });
+    ctx.widget = createWidget({
+      settings: ctx.settings,
+      onOpen: () => ctx.mainWindow.showTab('month'),
+      size: () => ctx.store.getSetting('widgetSize', DEFAULT_SIZE),
+    });
     ctx.setWidgetEnabled = (on) => {
       ctx.store.setSetting('widgetEnabled', !!on);
       applyWidget();

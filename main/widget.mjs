@@ -6,12 +6,12 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platform } from './platform/index.mjs';
-import { WIDGET_W, WIDGET_H, pickDisplay, boundsFor, relativeTo, displayContaining, displayLabel } from './widget-layout.mjs';
+import { pickDisplay, boundsFor, relativeTo, displayContaining, displayLabel, sizeOf, zoomOf } from './widget-layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SETTING = 'widget'; // settings.json — { displayId, x, y }. 창 위치는 UI 상태라 DB가 아니라 여기다
 
-export function createWidget({ settings, onOpen }) {
+export function createWidget({ settings, onOpen, size: readSize }) {
   let win = null;
   let pinner = null;
   let adjusting = false; // 위치 조정 모드 — 보통 창으로 잠시 바꿔 끌어 옮긴다(macOS는 이 길뿐이다)
@@ -20,12 +20,13 @@ export function createWidget({ settings, onOpen }) {
   let generation = 0; // 만들고 부수기를 반복하므로 늦게 온 pin 결과가 새 창에 붙지 않게 센다
 
   const saved = () => settings.get(SETTING, null) ?? {};
+  const size = () => sizeOf(readSize?.()); // 크기 단계는 앱 동작 값이라 store에 있다 — 부르는 쪽이 읽어 준다
   const primaryId = () => screen.getPrimaryDisplay().id;
   const targetDisplay = () => pickDisplay(screen.getAllDisplays(), saved().displayId, primaryId());
 
   function build() {
     const gen = ++generation;
-    const bounds = boundsFor(saved(), targetDisplay());
+    const bounds = boundsFor(saved(), targetDisplay(), size());
     const type = !adjusting && platform.widget.windowType ? { type: platform.widget.windowType } : {};
     win = new BrowserWindow({
       ...bounds,
@@ -78,7 +79,7 @@ export function createWidget({ settings, onOpen }) {
 
   function send() {
     if (!win || win.isDestroyed() || !lastPayload) return;
-    win.webContents.send('widget:state', { ...lastPayload, adjusting, interactive: adjusting || platform.widget.interactive });
+    win.webContents.send('widget:state', { ...lastPayload, zoom: zoomOf(size()), adjusting, interactive: adjusting || platform.widget.interactive });
   }
 
   function teardown() {
@@ -93,7 +94,7 @@ export function createWidget({ settings, onOpen }) {
   // 모니터가 바뀌면 저장된 자리로 다시 간다 — 빠진 모니터면 주 모니터로
   function relocate() {
     if (!win || win.isDestroyed()) return;
-    win.setBounds(boundsFor(saved(), targetDisplay()));
+    win.setBounds(boundsFor(saved(), targetDisplay(), size()));
     pinner?.refresh();
   }
 
@@ -176,6 +177,12 @@ export function createWidget({ settings, onOpen }) {
       return screen.getAllDisplays().map((d, i) => ({ id: d.id, label: displayLabel(d, i, pid), current: d.id === cur }));
     },
 
+    // 크기 단계가 바뀌었다 — 같은 자리에서 다시 재고(화면 밖이면 당긴다) 글자 배율도 다시 보낸다
+    resize() {
+      relocate();
+      send();
+    },
+
     // 모니터를 바꾸면 자리는 그 모니터의 기본 자리(오른쪽 위)로 돌아간다 — 이전 모니터 기준 좌표는 뜻이 없다
     setDisplay(id) {
       settings.set(SETTING, { displayId: id });
@@ -189,5 +196,3 @@ export function createWidget({ settings, onOpen }) {
 
   return api;
 }
-
-export { WIDGET_W, WIDGET_H };
