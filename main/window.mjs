@@ -103,6 +103,11 @@ export function createMainWindow(settings) {
       else win.webContents.send('cal:deeplink', payload);
     },
 
+    // 특정 탭을 열어 보인다 — 위젯을 클릭하면 월 탭(WGT-03). 딥링크 `open`과 같은 길을 탄다
+    showTab(tab) {
+      this.deepLink({ command: 'open', args: { tab } });
+    },
+
     // 일정이 바뀌면 열려 있는 창에 알린다. 닫혀 있으면 다음에 열 때 어차피 다시 읽는다.
     notifyChanged() {
       if (win && !win.isDestroyed()) win.webContents.send('cal:changed');

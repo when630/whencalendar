@@ -242,6 +242,10 @@ export function registerIpc(ctx) {
       remindMin: st.getSetting('remindMin', 10),
       autoStart: app.getLoginItemSettings().openAtLogin,
       dataDir: path.dirname(st.file),
+      // 바탕화면 위젯(WGT) — 켬·끔과 모니터 목록. 어느 모니터가 지금 것인지는 목록이 말한다
+      widgetEnabled: st.getSetting('widgetEnabled', false),
+      widgetDisplays: ctx.widget?.displays() ?? [],
+      widgetActive: !!ctx.widget?.active,
       // 전역 단축키 — 지금 잡혀 있는 조합과 그 등록 성공 여부(PLAT-02). 표기는 main이 만든다.
       platform: platform.id,
       hotkeys: { ...(ctx.hotkeys ?? {}) },
@@ -293,6 +297,14 @@ export function registerIpc(ctx) {
   });
 
   ipcMain.handle('settings:set', (_e, { key, value }) => {
+    if (key === 'widgetEnabled') {
+      ctx.setWidgetEnabled?.(!!value);
+      return { ok: true };
+    }
+    if (key === 'widgetDisplayId') {
+      ctx.widget?.setDisplay(value);
+      return { ok: true };
+    }
     if (key === 'autoStart') {
       // 개발 실행에 자동 시작을 걸면 설치본과 싸운다 — 패키징된 앱에서만 건다
       if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!value });
@@ -300,6 +312,13 @@ export function registerIpc(ctx) {
     }
     store()?.setSetting(key, value);
     ctx.onChanged?.();
+    return { ok: true };
+  });
+
+  // 위젯 위치 조정 — 창을 보통 창으로 바꿔 끌게 한다. 끝은 위젯의 "완료"가 낸다
+  ipcMain.handle('widget:adjust', () => {
+    if (!ctx.widget?.active) return { ok: false, error: '위젯이 꺼져 있습니다' };
+    ctx.widget.setAdjusting(true);
     return { ok: true };
   });
 

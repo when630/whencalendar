@@ -8,6 +8,15 @@ contextBridge.exposeInMainWorld('overlay', {
   setHover: (on) => ipcRenderer.send('overlay:hover', !!on),
 });
 
+// 바탕화면 위젯(WGT) — 그리는 데이터는 main이 밀어 주고, 조작은 끌기·클릭·조정 완료 셋뿐이다.
+// 끌기의 좌표는 main이 커서로 잰다 — 렌더러는 단계만 알린다.
+contextBridge.exposeInMainWorld('widget', {
+  onState: (fn) => ipcRenderer.on('widget:state', (_e, payload) => fn(payload)),
+  drag: (phase) => ipcRenderer.send('widget:drag', phase),
+  open: () => ipcRenderer.send('widget:open'),
+  adjustDone: () => ipcRenderer.send('widget:adjustDone'),
+});
+
 // 본체 창 — 저장소에 닿는 것은 전부 여기를 지난다. 렌더러는 SQL을 모른다.
 contextBridge.exposeInMainWorld('cal', {
   list: (opts) => ipcRenderer.invoke('cal:list', opts),
@@ -36,6 +45,8 @@ contextBridge.exposeInMainWorld('app', {
   set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
   // 전역 단축키 — 자리(window·overlay)와 Accelerator 문자열. 빈 문자열은 그 자리를 비운다
   hotkeySet: (key, accel) => ipcRenderer.invoke('hotkey:set', { key, accel }),
+  // 바탕화면 위젯 — 위치 조정 모드로 들어간다(끌어 옮기고 위젯의 "완료"로 끝난다)
+  widgetAdjust: () => ipcRenderer.invoke('widget:adjust'),
   // 업데이트 — 확인은 끝난 뒤 결과 줄을 돌려주고, 설치는 준비된 것이 있을 때만 재시작한다
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateInstall: () => ipcRenderer.invoke('update:install'),

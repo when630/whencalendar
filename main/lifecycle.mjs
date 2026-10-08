@@ -10,6 +10,8 @@ import { createStore } from './store.mjs';
 import { createSettings } from './settings.mjs';
 import { createOverlay } from './overlay.mjs';
 import { createMainWindow } from './window.mjs';
+import { createWidget } from './widget.mjs';
+import { monthGrid } from './widget-layout.mjs';
 import { registerIpc } from './ipc.mjs';
 import { stateAt, msUntilNextChange, DEFAULTS, dueReminders, remindText } from './clock.mjs';
 import { syncAll, SYNC_INTERVAL_MS } from './sync.mjs';
@@ -146,7 +148,7 @@ export function bootstrap() {
     return;
   }
 
-  const ctx = { store: null, settings: null, overlay: null, mainWindow: null, tray: null, timer: null, syncTimer: null };
+  const ctx = { store: null, settings: null, overlay: null, mainWindow: null, widget: null, tray: null, timer: null, syncTimer: null };
   const sentReminders = new Set();
   const failedShortcuts = [];
 
@@ -234,12 +236,42 @@ export function bootstrap() {
     if (sentReminders.size > 500) sentReminders.clear();
   }
 
+  // 바탕화면 위젯에 보낼 한 달치(WGT-02). 격자가 보이는 주만 — 4~6주
+  function widgetPayload() {
+    const now = new Date();
+    const g = monthGrid(now);
+    const events = ctx.store.ok ? ctx.store.listBetween(g.start.toISOString(), g.end.toISOString()) : [];
+    return {
+      now: now.toISOString(),
+      start: g.start.toISOString(),
+      weeks: g.weeks,
+      events: events.map((ev) => ({ title: ev.title, startsAt: ev.startsAt, endsAt: ev.endsAt, allDay: !!ev.allDay, color: ev.color ?? null })),
+    };
+  }
+
+  function widgetEnabled() {
+    return !!(ctx.store?.ok && ctx.store.getSetting('widgetEnabled', false));
+  }
+
+  // 켜고 끄는 길은 하나다 — 트레이·설정 탭 어느 쪽이든 여기를 지난다
+  function applyWidget() {
+    if (!ctx.widget) return;
+    if (widgetEnabled()) {
+      ctx.widget.start();
+      ctx.widget.push(widgetPayload());
+    } else {
+      ctx.widget.stop();
+    }
+    rebuildTrayMenu();
+  }
+
   function tick() {
     clearTimeout(ctx.timer);
     const events = loadEvents();
     const opts = overlayOptions(ctx.store);
     const st = stateAt(Date.now(), events, opts);
     ctx.overlay.push(toPayload(st, ctx.store));
+    if (ctx.widget?.active) ctx.widget.push(widgetPayload());
     fireReminders(events);
 
     // 오늘 일정이 없어도 자정에는 다시 봐야 한다
@@ -261,6 +293,18 @@ export function bootstrap() {
         type: 'checkbox',
         checked: ctx.overlay?.suspended ?? false,
         click: (item) => ctx.overlay.setSuspended(item.checked),
+      },
+      { type: 'separator' },
+      {
+        label: '바탕화면 위젯',
+        type: 'checkbox',
+        checked: widgetEnabled(),
+        click: (item) => ctx.setWidgetEnabled?.(item.checked),
+      },
+      {
+        label: ctx.widget?.adjusting ? '위젯 위치 조정 끝내기' : '위젯 위치 조정…',
+        enabled: !!ctx.widget?.active,
+        click: () => ctx.widget?.setAdjusting(!ctx.widget.adjusting),
       },
     ];
 
@@ -345,6 +389,14 @@ export function bootstrap() {
     ctx.overlay = createOverlay();
     ctx.overlay.start();
     ctx.mainWindow = createMainWindow(ctx.settings);
+    // 바탕화면 위젯(WGT) — 클릭하면 본체 월 탭. 켜 둔 사람에게만 뜬다
+    ctx.widget = createWidget({ settings: ctx.settings, onOpen: () => ctx.mainWindow.showTab('month') });
+    ctx.setWidgetEnabled = (on) => {
+      ctx.store.setSetting('widgetEnabled', !!on);
+      applyWidget();
+      ctx.mainWindow.notifyChanged(); // 설정 탭이 열려 있으면 토글 상태를 맞춘다
+    };
+    applyWidget();
 
     // 일정이 바뀌면 열린 창을 새로 그리고, 오버레이도 즉시 다시 센다 —
     // 방금 넣은 일정이 아일랜드에 안 보이면 넣은 것 같지가 않다.
@@ -424,6 +476,7 @@ export function bootstrap() {
     globalShortcut.unregisterAll();
     ctx.updater?.stop();
     ctx.overlay?.destroy();
+    ctx.widget?.destroy();
     ctx.mainWindow?.destroy();
     ctx.settings?.flush();
     ctx.store?.close();

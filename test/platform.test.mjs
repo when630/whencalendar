@@ -55,7 +55,7 @@ test('모르는 OS는 Windows 표로 떨어진다 — 개발 실행이 죽지 �
 test('두 표의 열쇠가 같다', () => {
   const keys = (o) => Object.keys(o).sort();
   assert.deepEqual(keys(darwin), keys(win32));
-  for (const group of ['tray', 'overlay', 'update', 'window']) {
+  for (const group of ['tray', 'overlay', 'update', 'window', 'widget']) {
     assert.deepEqual(keys(darwin[group]), keys(win32[group]), group);
   }
 });
@@ -145,4 +145,16 @@ test('macOS는 Dock에서 빠지고, 그래서 응용 프로그램 메뉴를 들
 
   assert.equal(win32.hideDock, false);
   assert.equal(win32.appMenu, null, 'Windows 기본 메뉴를 지우지 않는다');
+});
+
+// 바탕화면 위젯(D-35) — macOS는 창 종류 하나로 바탕화면 레벨에 놓이지만 입력을 못 받고, Windows는 Win32로 붙들어 두되 마우스는 받는다.
+test('위젯은 macOS에서 desktop 창, Windows에서 toolbar 창 + Win32 고정이다 (D-35)', () => {
+  assert.equal(darwin.widget.windowType, 'desktop');
+  assert.equal(darwin.widget.interactive, false, 'desktop 창은 마우스를 못 받는다 — 끌기는 위치 조정 모드로');
+  assert.equal(darwin.widget.pin, null);
+
+  assert.equal(win32.widget.windowType, 'toolbar', 'WS_EX_TOOLWINDOW — 작업 표시줄·Alt+Tab에서 빠진다');
+  assert.equal(win32.widget.interactive, true);
+  assert.equal(typeof win32.widget.pin, 'function');
+  assert.ok(win32.widget.pollMs > 0 && win32.widget.pollMs <= 1000, 'Win+D 뒤 가려진 시간이 눈에 띄지 않을 만큼 짧아야 한다');
 });

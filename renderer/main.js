@@ -1081,6 +1081,25 @@ function settingRows() {
       label: '몇 분 전에',
       opts: [5, 10, 15, 30, 60].map((m) => ({ v: m, label: `${m}분` })),
     },
+    { grp: '바탕화면 위젯' },
+    {
+      key: 'widgetEnabled',
+      label: '바탕화면에 달력 띄우기',
+      sub: '다른 창 아래, 바탕화면 바로 위에 이 달 일정이 놓인다 · 클릭하면 월 탭',
+      opts: [{ v: true, label: '켬' }, { v: false, label: '끔' }],
+    },
+    ...(st.widgetEnabled && st.widgetDisplays?.length
+      ? [
+          {
+            key: 'widgetDisplayId',
+            label: '모니터',
+            sub: '바꾸면 그 모니터의 오른쪽 위로 간다',
+            opts: st.widgetDisplays.map((d) => ({ v: d.id, label: d.label })),
+            cur: st.widgetDisplays.find((d) => d.current)?.id,
+          },
+          { action: 'widgetAdjust', label: '위치 조정', sub: '위젯을 마우스로 끌어 옮기고 "완료"를 누른다', val: 'Enter' },
+        ]
+      : []),
     { grp: '단축키' },
     ...HOTKEY_ROWS.map((r) => ({ ...r, kind: 'hotkey', val: hotkeyValue(r.key) })),
     { grp: '일반' },
@@ -1186,7 +1205,7 @@ function renderSettings() {
     row.append(lb);
 
     if (r.opts) {
-      const cur = st[r.key];
+      const cur = 'cur' in r ? r.cur : st[r.key];
       const active = r.opts.findIndex((o) => o.v === cur);
       row.append(seg(r.opts.map((o) => o.label), active));
     } else {
@@ -1218,7 +1237,7 @@ async function settingAction(item, dir) {
     return;
   }
   if (item.opts) {
-    const cur = state.settings[item.key];
+    const cur = 'cur' in item ? item.cur : state.settings[item.key];
     const i = item.opts.findIndex((o) => o.v === cur);
     const next = item.opts[(i + (dir || 1) + item.opts.length) % item.opts.length];
     const r = await window.app.set(item.key, next.v);
@@ -1229,6 +1248,11 @@ async function settingAction(item, dir) {
     return;
   }
   if (item.action === 'openDir') return void window.app.openDataDir();
+  if (item.action === 'widgetAdjust') {
+    const r = await window.app.widgetAdjust();
+    toast(r.ok ? '위젯을 끌어 옮기고 "완료"를 누르세요' : r.error ?? '위젯이 꺼져 있습니다');
+    return;
+  }
   if (item.action === 'update') return runUpdate();
   if (item.action === 'exportJson') {
     const r = await window.app.exportJson();
@@ -2173,5 +2197,12 @@ window.cal.onDeepLink(({ command, args }) => {
     if (state.overlay) closeOverlay();
     openDialog('event', args?.text ?? '');
     previewParse();
+  } else if (command === 'open' && args?.tab && TABS.some((t) => t.key === args.tab)) {
+    // 위젯 클릭 — 월 탭을 이번 달로 연다(WGT-03)
+    if (state.view) closeView();
+    if (state.overlay) closeOverlay();
+    state.tab = args.tab;
+    state.anchor = new Date();
+    load();
   }
 });

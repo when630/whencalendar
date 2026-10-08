@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link href="./tokens.css" rel="stylesheet" />
+    <title>whencalendar widget</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        font-family: var(--font-sans);
+        -webkit-user-select: none;
+        cursor: default;
+        color: var(--text-primary);
+      }
+
+      /* 바탕화면 위에 놓이는 판 — 벽지가 밝든 어둡든 읽히게 조금 불투명하다 */
+      #card {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 12px 14px 12px;
+        background: rgba(18, 21, 27, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--r-lg);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+      }
+      #card.interactive {
+        cursor: grab;
+      }
+      #card.dragging {
+        cursor: grabbing;
+      }
+
+      /* 위치 조정 중 — 테두리가 살아나고 "완료"가 뜬다 */
+      #card.adjusting {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-dim), 0 12px 40px rgba(0, 0, 0, 0.5);
+      }
+      #adjust {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: var(--r-sm);
+        background: var(--accent-dim);
+        color: var(--text-primary);
+        font-size: var(--fs-xs);
+      }
+      #card.adjusting #adjust {
+        display: flex;
+      }
+      #adjust b {
+        font-weight: 650;
+      }
+      #adjust button {
+        margin-left: auto;
+        font: inherit;
+        font-weight: 650;
+        color: #16171c;
+        background: var(--accent);
+        border: 0;
+        border-radius: var(--r-sm);
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+
+      #head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex: none;
+      }
+      #head b {
+        font-size: var(--fs-lg);
+        font-weight: 700;
+      }
+      #head span {
+        font-size: var(--fs-xs);
+        color: var(--text-muted);
+      }
+
+      .dow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+        flex: none;
+      }
+      .dow span {
+        text-align: center;
+        font-size: 10.5px;
+        color: var(--text-muted);
+      }
+      .dow span.we {
+        color: #8a6f78;
+      }
+
+      .cells {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+        flex: 1;
+        min-height: 0;
+      }
+      .c {
+        background: rgba(255, 255, 255, 0.035);
+        border-radius: var(--r-sm);
+        padding: 3px 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .c.out {
+        opacity: 0.3;
+      }
+      .c.we .dnum {
+        color: #8a6f78;
+      }
+      .c.today {
+        background: rgba(122, 162, 247, 0.12);
+      }
+      .c.today .dnum {
+        color: #16171c;
+        background: var(--accent);
+        font-weight: 750;
+      }
+      .chead {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        flex: none;
+      }
+      .dnum {
+        font-size: 11px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+        min-width: 16px;
+        text-align: center;
+        border-radius: 99px;
+        padding: 0 3px;
+        line-height: 15px;
+      }
+      .plus {
+        margin-left: auto;
+        font-size: 9.5px;
+        color: var(--text-muted);
+      }
+      /* 일정 한 줄 — "제목 시각". 칸이 좁으니 시각은 뒤에 작게 */
+      /* 제목은 두 줄까지 — 칸이 좁아 한 줄이면 "다가오…"만 남는다. 더 길면 말줄임 */
+      .pin {
+        display: flex;
+        align-items: flex-start;
+        gap: 3px;
+        flex: none;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--text-secondary);
+        overflow: hidden;
+      }
+      .pin i {
+        width: 3px;
+        height: 8px;
+        border-radius: 2px;
+        flex: none;
+        margin-top: 3px;
+      }
+      .pin .t {
+        min-width: 0;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        word-break: break-all;
+      }
+      .pin .h {
+        flex: none;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        font-size: 9.5px;
+      }
+      .pin.past {
+        opacity: 0.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card">
+      <div id="adjust"><b>끌어서 옮기세요</b><span>자리가 정해지면</span><button id="done">완료</button></div>
+      <div id="head"><b id="title"></b><span id="sub"></span></div>
+      <div class="dow" id="dow"></div>
+      <div class="cells" id="cells"></div>
+    </div>
+    <script src="./widget.js"></script>
+  </body>
+</html>

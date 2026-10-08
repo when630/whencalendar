@@ -30,6 +30,19 @@ export const win32 = {
     workspaces: { visibleOnFullScreen: true },
   },
 
+  // 바탕화면 위젯(WGT). Windows에는 "바탕화면 레벨" 창 종류가 없다 — Electron이 지원하는 것은 `toolbar`
+  // (WS_EX_TOOLWINDOW: 작업 표시줄·Alt+Tab에서 빠진다)뿐이다. 다른 창 아래에 두는 일은 Win32 API로 직접 한다(D-35):
+  // z-order 맨 아래(HWND_BOTTOM)가 아니라 **바탕화면 창 바로 위**에 끼운다. 맨 아래는 Win+D 때 바탕화면이 위로
+  // 올라와 위젯이 가려진다(2026-10-08 실측). 그 작업은 koffi를 쓰므로 Windows에서만, 그것도 쓸 때만 읽는다.
+  widget: {
+    windowType: 'toolbar',
+    // 포커스 없는 창도 마우스는 받는다 — 위젯 위에서 끌어 옮기고, 클릭하면 본체 월 탭을 연다
+    interactive: true,
+    // 바탕화면 창이 우리 위로 올라왔는지 보는 주기. Win+D 전환 중 잠깐 가려졌다가 이 시간 안에 돌아온다
+    pollMs: 250,
+    pin: (win, opts) => import('./win32-desktop.mjs').then((m) => m.pinAboveDesktop(win, opts)),
+  },
+
   update: {
     // 미서명이어도 NSIS는 설치된다. 내려받아 두고 종료할 때 설치한다 (REL-03).
     autoDownload: true,

@@ -47,6 +47,16 @@ export const darwin = {
     workspaces: { visibleOnFullScreen: true, skipTransformProcessType: true },
   },
 
+  // 바탕화면 위젯(WGT). macOS는 Electron이 `desktop` 종류를 공식 지원한다 — 바탕화면 배경 레벨(kCGDesktopWindowLevel-1)에
+  // 놓이고 Win+D에 해당하는 "데스크탑 보기" 뒤에도 남는다. 대신 **포커스·키·마우스를 전혀 받지 못한다** — 끌어 옮기기는
+  // 트레이의 "위치 조정"으로 보통 창으로 잠시 바꿔서 한다(D-35). (실기기 미검증)
+  widget: {
+    windowType: 'desktop',
+    interactive: false,
+    pollMs: 0,
+    pin: null,
+  },
+
   update: {
     autoDownload: false,
     installOnQuit: false,
