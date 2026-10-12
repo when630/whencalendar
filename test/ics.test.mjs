@@ -219,6 +219,12 @@ test('겹침 판정 — 맞닿기만 한 것은 겹친 게 아니다', () => {
   assert.equal(overlaps(ev, new Date(2026, 8, 17, 10, 30).toISOString(), new Date(2026, 8, 17, 12).toISOString()), true);
 });
 
+test('겹침 판정 — 끝 없는 일정은 범위 시작에 놓여도 안이다', () => {
+  const point = { startsAt: new Date(2026, 8, 17).toISOString(), endsAt: null };
+  assert.equal(overlaps(point, new Date(2026, 8, 17).toISOString(), new Date(2026, 8, 18).toISOString()), true);
+  assert.equal(overlaps(point, new Date(2026, 8, 16).toISOString(), new Date(2026, 8, 17).toISOString()), false);
+});
+
 test('.ics에서 읽은 반복 일정이 그대로 펼쳐진다 — 경계', () => {
   const ics = wrap(
     vevent([

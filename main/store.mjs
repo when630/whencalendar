@@ -342,13 +342,16 @@ export function createStore(file) {
       // 반복 일정은 시작 시각이 범위보다 한참 앞이라 SQL 범위 조건으로는 걸리지 않는다.
       // 그래서 두 번에 나눠 가져온다 — 범위와 겹치는 단발 일정, 그리고 반복 규칙이 있는 것 전부.
       // 후자는 recur.expand가 범위만큼만 펼친다(D-07).
+      //
+      // 끝이 없는 일정은 시작 시각 한 점이다 — 범위 시작과 같은 시각이면 범위 안이다.
+      // 하루짜리 종일 일정이 딱 그 경우(그날 0시, 끝 없음)라 `끝 > 범위 시작`만 보면 오늘 탭에서 빠졌다.
       const plain = q(
         `SELECT ${EVENT_COLS}
            FROM event e JOIN calendar c ON c.id = e.calendar_id
           WHERE e.deleted_at IS NULL AND c.enabled = 1 AND e.rrule IS NULL
-            AND e.starts_at < ? AND COALESCE(e.ends_at, e.starts_at) > ?`
+            AND e.starts_at < ? AND (e.ends_at > ? OR e.starts_at >= ?)`
       )
-        .all(toISO, fromISO)
+        .all(toISO, fromISO, fromISO)
         .map(toDomain);
 
       const repeating = q(

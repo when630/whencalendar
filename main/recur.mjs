@@ -55,7 +55,7 @@ export function expandOne(ev, from, to) {
     const s = next.toJSDate().getTime();
     if (s >= toMs) break; // 범위를 지났다 — 반복은 시간순이므로 여기서 끝
     const e = s + durMs;
-    if (e <= fromMs) continue; // 아직 범위 앞이다
+    if (e <= fromMs && s < fromMs) continue; // 아직 범위 앞이다 — 길이 0인 회차는 범위 시작에 놓여도 안이다
     if (skip.has(s)) continue; // EXDATE
 
     const ov = overrides.get(s);
@@ -81,10 +81,11 @@ export function expand(events, from, to) {
   return out.sort((a, b) => MS(a.startsAt) - MS(b.startsAt));
 }
 
-// 범위와 겹치는가. 끝이 없는 일정은 시작 시각만으로 본다 — store.listBetween과 같은 규칙이다.
+// 범위와 겹치는가. 끝이 없는 일정은 시작 시각 한 점으로 보고, 그 점이 [from, to)에 들면 겹친다
+// — store.listBetween과 같은 규칙이다.
 export function overlaps(ev, from, to) {
   if (!ev?.startsAt) return false;
   const s = MS(ev.startsAt);
   const e = ev.endsAt ? MS(ev.endsAt) : s;
-  return s < MS(to) && Math.max(e, s) > MS(from);
+  return s < MS(to) && (e > MS(from) || s >= MS(from));
 }

@@ -94,3 +94,21 @@ test('오늘 일정이 전부 지났으면 idle이다 — 이건 정상이다', 
   assert.equal(stateAt(now, events).mode, 'idle', '다만 보여 줄 것은 없다');
   s.close();
 });
+
+// 하루짜리 종일 일정은 "그날 0시, 끝 없음"으로 저장된다. 오늘 탭의 범위 시작과 정확히 같은 시각이라
+// `끝 > 범위 시작`으로만 거르면 빠졌다 — 위젯(한 달치 범위)에는 보이고 오늘 탭에는 안 보이던 버그.
+test('끝 없는 하루짜리 종일 일정이 그날 범위에 걸린다', () => {
+  const s = freshStore();
+  const cal = s.localCalendarId();
+  const day = new Date(2026, 9, 12);
+  s.addEvent({ calendarId: cal, title: '휴가', startsAt: day.toISOString(), endsAt: null, allDay: 1 });
+  s.addEvent({ calendarId: cal, title: '매주 종일', startsAt: day.toISOString(), endsAt: null, allDay: 1, rrule: 'FREQ=WEEKLY' });
+
+  const [from, to] = dayRange(day);
+  assert.deepEqual(s.listBetween(from, to).map((e) => e.title).sort(), ['매주 종일', '휴가']);
+
+  // 전날·다음날 범위에는 걸리지 않는다
+  assert.equal(s.listBetween(...dayRange(new Date(2026, 9, 11))).length, 0);
+  assert.deepEqual(s.listBetween(...dayRange(new Date(2026, 9, 13))).map((e) => e.title), []);
+  s.close();
+});

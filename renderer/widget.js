@@ -43,6 +43,14 @@ function daySpan(ev) {
   return { from: s, to: e };
 }
 
+// 끝난 시각. 종일 일정의 끝은 배타적이고, 끝이 없는 하루짜리는 그날 자정까지다 — 본체 eventEnd와 같은 규칙.
+// 시작 시각으로 보면 오늘 종일 일정이 0시부터 흐리게 칠해진다
+function endOf(ev) {
+  const s = new Date(ev.startsAt);
+  if (ev.endsAt) return new Date(ev.endsAt);
+  return ev.allDay ? addDays(startOfDay(s), 1) : s;
+}
+
 function renderDow(weekStart) {
   el.dow.replaceChildren(
     ...DAYS.map((_, i) => {
@@ -75,6 +83,11 @@ function render(p) {
     }
   }
 
+  // 칸 안에서는 종일이 먼저다 — 하루 전체에 걸린 것이 위, 시각이 있는 것은 그 아래 시간순
+  for (const list of byDay.values()) {
+    list.sort((a, b) => b.ev.allDay - a.ev.allDay || Date.parse(a.ev.startsAt) - Date.parse(b.ev.startsAt));
+  }
+
   const cells = [];
   for (let i = 0; i < p.weeks * 7; i++) {
     const day = addDays(start, i);
@@ -95,13 +108,12 @@ function render(p) {
     const list = byDay.get(dayKey(day)) ?? [];
     list.slice(0, MAX_PINS).forEach(({ ev, first }) => {
       const pin = document.createElement('span');
-      pin.className = 'pin';
+      // 종일은 달력 색을 깐 띠, 시각이 있는 것은 색 막대 + 시각 — 시각이 안 보이는 시간 일정과 헷갈리지 않게
+      pin.className = ev.allDay ? 'pin allday' : 'pin';
+      pin.style.setProperty('--c', `var(--cal-${ev.color ?? 1})`);
       const s = new Date(ev.startsAt);
-      const e = ev.endsAt ? new Date(ev.endsAt) : s;
-      if (e < now) pin.classList.add('past');
-      const bar = document.createElement('i');
-      bar.style.background = `var(--cal-${ev.color ?? 1})`;
-      pin.append(bar);
+      if (endOf(ev) <= now) pin.classList.add('past');
+      if (!ev.allDay) pin.append(document.createElement('i'));
       // "9:32 디자인 리뷰" — 시각이 앞이고 제목이 남은 폭을 쓴다(WGT-02). 여러 날짜리는 첫날에만 시각
       if (first && !ev.allDay) {
         const h = document.createElement('span');

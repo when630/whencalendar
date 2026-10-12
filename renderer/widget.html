@@ -175,6 +175,15 @@
         height: 8px;
         border-radius: 2px;
         flex: none;
+        background: var(--c);
+      }
+      /* 종일 — 막대 대신 칸 폭 전체에 달력 색을 옅게 깐다. 시각 자리가 없으니 띠 자체가 표시다 */
+      .pin.allday {
+        padding: 0 4px;
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--c) 24%, transparent);
+        box-shadow: inset 2px 0 0 var(--c);
+        color: var(--text-primary);
       }
       .pin .t {
         min-width: 0;
