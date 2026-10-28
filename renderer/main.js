@@ -1245,6 +1245,8 @@ function renderSettings() {
 
   setBody(wrap);
   keepSelVisible();
+
+  window.whenAppearanceUI.mount(wrap);
 }
 
 async function loadSettings() {

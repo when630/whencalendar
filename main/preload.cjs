@@ -65,3 +65,14 @@ contextBridge.exposeInMainWorld('subs', {
   color: (id, color) => ipcRenderer.invoke('sub:color', { id, color }),
   remove: (id) => ipcRenderer.invoke('sub:delete', id),
 });
+
+// Appearance is stored by the main process and broadcast to every app window.
+contextBridge.exposeInMainWorld('whenAppearance', {
+  initial: ipcRenderer.sendSync('appearance:get'),
+  set: (patch) => ipcRenderer.invoke('appearance:set', patch),
+  onChange: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('appearance:changed', listener);
+    return () => ipcRenderer.removeListener('appearance:changed', listener);
+  },
+});
